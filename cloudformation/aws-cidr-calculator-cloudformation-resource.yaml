@@ -1,0 +1,130 @@
+AWSTemplateFormatVersion: 2010-09-09
+Description: Create a DynamoDB table, a Lambda function that can be called as a CFN Custom Resource, and a role for the Lambda function to use to access the table.
+# vim: ts=64 sw=2 filetype=yaml
+
+Parameters:
+
+  S3BucketName:
+    Description: CidrProvider Bucket
+    Type: String
+    Default: ow-lambda-functions-bucket
+  
+  S3BucketAsset:
+    Description: CidrProvider zip file
+    Type: String
+    Default: cidrProvider.zip
+
+  CidrTableName:
+    Type: String
+    Default: vpccidrtable
+
+  ReadCapacityUnits:
+    Type: Number
+    MinValue: 1
+    MaxValue: 1 
+    Default: 1
+
+  WriteCapacityUnits:
+    Type: Number
+    MinValue: 1
+    MaxValue: 1 
+    Default: 1
+
+Resources:
+  CidrDynamoDBTable:
+    Type: AWS::DynamoDB::Table
+    Properties:
+      AttributeDefinitions:
+        - AttributeName: "physical_resource_id"
+          AttributeType: "S"
+      KeySchema:
+        - AttributeName: "physical_resource_id"
+          KeyType: "HASH"
+      ProvisionedThroughput:
+        ReadCapacityUnits: !Ref ReadCapacityUnits
+        WriteCapacityUnits: !Ref WriteCapacityUnits
+      TableName: !Ref CidrTableName
+
+  # Create the role and policy for the Lambda role to be able to manage records in the DynamoDB table
+  CidrCalculatorRegisterLambdaServiceRole:
+    Type: 'AWS::IAM::Role'
+    Properties:
+      AssumeRolePolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+        - Effect: Allow
+          Principal:
+            Service: 'lambda.amazonaws.com'
+          Action:
+          - 'sts:AssumeRole'
+      Path: '/'
+      ManagedPolicyArns:
+      - 'arn:aws:iam::aws:policy/service-role/AWSLambdaBasicExecutionRole'
+      Policies:
+      - PolicyName: CidrCalculatorRegisterLambdaRole
+        PolicyDocument:
+          Statement:
+          - Effect: Allow
+            Action:
+              - "dynamodb:BatchGet*"
+              - "dynamodb:DescribeTable"
+              - "dynamodb:Get*"
+              - "dynamodb:Scan"
+              - "dynamodb:Delete*"
+              - "dynamodb:Update*"
+              - "dynamodb:PutItem"
+            Resource:
+              !Join
+                - ':'
+                - - 'arn:aws:dynamodb'
+                  - !Sub ${AWS::Region}
+                  - !Sub ${AWS::AccountId}
+                  - !Join
+                    - '/'
+                    - - 'table'
+                      - !Ref CidrTableName
+
+  CidrCalculatorRegisterLambda:
+    Type: 'AWS::Lambda::Function'
+    Properties:
+      FunctionName: CidrProvider
+      Description: Cidr Calculator to allocate IP addresses for VPC's and Subnets.
+      Code:
+        S3Bucket: !Ref S3BucketName
+        S3Key: !Ref S3BucketAsset
+      Handler: 'cidrProvider.lambda_handler'
+      Environment:
+        Variables:
+          table_name: !Ref CidrTableName
+      MemorySize: 128
+      Role: !GetAtt 'CidrCalculatorRegisterLambdaServiceRole.Arn'
+      Runtime: 'python3.7'
+      Timeout: 30
+  
+  CidrCalculatorLambdaVersion: 
+    Type: 'AWS::Lambda::Version'
+    Properties: 
+      FunctionName: !Ref CidrCalculatorRegisterLambda
+      Description: Cidr Calculator version control
+
+  CidrCalculatorARNParameter:
+    Type: 'AWS::SSM::Parameter'
+    Properties:
+      Description: Cidr Calculator ARN Parameter
+      Name: "/org/primary/lambda/cidr_provider/arn"
+      Type: String
+      Value: !GetAtt 'CidrCalculatorRegisterLambda.Arn'
+
+Outputs:
+
+  CidrCalculatorRegisterLambdaMasterRoleArn:
+    Description: The ARN of the role to assume to be able to invoke the Lambda function
+    Value: !GetAtt 'CidrCalculatorRegisterLambdaServiceRole.Arn'
+    Export:
+      Name: !Sub "${AWS::StackName}-CidrCalculatorRegisterLambdaMasterRoleArn"
+
+  CidrCalculatorRegisterLambdaName:
+    Description: The name of the Lambda function to invoke
+    Value: !Ref CidrCalculatorRegisterLambda
+    Export:
+      Name: !Sub "${AWS::StackName}-CidrCalculatorRegisterLambdaName"

@@ -1,0 +1,100 @@
+AWSTemplateFormatVersion: 2010-09-09
+Description: Custom Resource For Retrieving Subnets and CIDR
+# vim: ts=64 sw=2 filetype=yaml
+
+Parameters:
+  Region:
+    Type: String
+    AllowedValues:
+      - us-east-1
+      - us-east-2
+      - us-west-2
+  ConnectionType:
+    Type: String
+    AllowedValues:
+      - internet
+      - non-internet
+    Default: internet
+  EnvironmentType:
+    Type: String
+    AllowedValues:
+      - prod
+      - lab
+      - qa
+      - dev
+    Default: lab
+  NetworkType:
+    Type: String
+    AllowedValues:
+      - cgs
+      - fms
+      - corp 
+  Sizing:
+    Type: String
+    AllowedValues:
+      - XS
+      - S
+      - M
+      - L
+      - XL
+    Default: S
+
+  
+Resources:
+              
+  GetCidr:
+    Type: Custom::CidrProvider
+    Properties:
+      # Update the ServiceToken with the ARN of the Lambda function. 
+      ServiceToken: !Join
+                  - ':'
+                  - - 'arn:aws:lambda'
+                    - !Sub ${AWS::Region}
+                    - !Sub ${AWS::AccountId}
+                    -  'function:CidrProvider:$LATEST'
+      Environment: !Ref EnvironmentType
+      Internet: !Ref ConnectionType
+      Region: !Ref Region
+      Sizing: !Ref Sizing
+      Network: !Ref NetworkType
+        
+Outputs:
+  CIDRBlock:
+    Description: Return Subnets and VPC CIDR from CidrProvider 
+    Value: !GetAtt GetCidr.VPCCidr
+  SubnetPublic1:
+    Description: Return Subnets and VPC CIDR from CidrProvider 
+    Value: !GetAtt GetCidr.SubnetPublic1
+  SubnetPublic2:
+    Description: Return Subnets and VPC CIDR from CidrProvider 
+    Value: !GetAtt GetCidr.SubnetPublic2
+  SubnetPublic3:
+    Description: Return Subnets and VPC CIDR from CidrProvider 
+    Value: !GetAtt GetCidr.SubnetPublic3
+  SubnetPublic4:
+    Description: Return Subnets and VPC CIDR from CidrProvider 
+    Value: !GetAtt GetCidr.SubnetPublic4
+  SubnetPrivate1:
+    Description: Return Subnets and VPC CIDR from CidrProvider 
+    Value: !GetAtt GetCidr.SubnetPrivate1
+  SubnetPrivate2:
+    Description: Return Subnets and VPC CIDR from CidrProvider 
+    Value: !GetAtt GetCidr.SubnetPrivate2
+  SubnetPrivate3:
+    Description: Return Subnets and VPC CIDR from CidrProvider 
+    Value: !GetAtt GetCidr.SubnetPrivate3
+  SubnetPrivate4:
+    Description: Return Subnets and VPC CIDR from CidrProvider 
+    Value: !GetAtt GetCidr.SubnetPrivate4
+  SubnetData1:
+    Description: Return Subnets and VPC CIDR from CidrProvider 
+    Value: !GetAtt GetCidr.SubnetData1
+  SubnetData2:
+    Description: Return Subnets and VPC CIDR from CidrProvider 
+    Value: !GetAtt GetCidr.SubnetData2
+  SubnetData3:
+    Description: Return Subnets and VPC CIDR from CidrProvider 
+    Value: !GetAtt GetCidr.SubnetData3
+  SubnetData4:
+    Description: Return Subnets and VPC CIDR from CidrProvider 
+    Value: !GetAtt GetCidr.SubnetData4
